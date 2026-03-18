@@ -7,9 +7,10 @@ import type { ApiMessage } from '@/api/messenger';
 
 interface ChatWindowProps {
   chatId: string | null;
+  chatBg?: string;
 }
 
-export default function ChatWindow({ chatId }: ChatWindowProps) {
+export default function ChatWindow({ chatId, chatBg }: ChatWindowProps) {
   const [inputText, setInputText] = useState('');
   const [chatMessages, setChatMessages] = useState<ApiMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,16 +20,30 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
   const [recordSeconds, setRecordSeconds] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recordIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastMsgIdRef = useRef<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadMessages = (chatIdVal: string, initial = false) => {
+    if (initial) setIsLoading(true);
+    fetchMessages(chatIdVal)
+      .then((msgs) => {
+        const lastId = msgs[msgs.length - 1]?.id ?? null;
+        if (initial || lastId !== lastMsgIdRef.current) {
+          setChatMessages(msgs);
+          lastMsgIdRef.current = lastId;
+          if (initial) markRead(chatIdVal);
+        }
+      })
+      .finally(() => { if (initial) setIsLoading(false); });
+  };
 
   useEffect(() => {
     if (!chatId) return;
-    setIsLoading(true);
-    fetchMessages(chatId)
-      .then((msgs) => {
-        setChatMessages(msgs);
-        markRead(chatId);
-      })
-      .finally(() => setIsLoading(false));
+    lastMsgIdRef.current = null;
+    loadMessages(chatId, true);
+
+    pollingRef.current = setInterval(() => loadMessages(chatId), 3000);
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [chatId]);
 
   useEffect(() => {
@@ -147,7 +162,12 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-3 relative"
+        style={chatBg ? { backgroundImage: `url(${chatBg})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+      >
+        {chatBg && <div className="absolute inset-0 bg-black/40 pointer-events-none" />}
+        <div className="relative z-10 space-y-3">
         {isLoading && (
           <div className="flex items-center justify-center h-20">
             <div className="w-6 h-6 rounded-full border-2 border-violet-500/50 border-t-violet-500 animate-spin" />
@@ -212,7 +232,8 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
             </div>
           );
         })}
-        <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Input */}

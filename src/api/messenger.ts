@@ -1,5 +1,17 @@
 const CHATS_URL = 'https://functions.poehali.dev/145acb06-bce6-4b63-aa61-4d57b6bc4c67';
 const MESSAGES_URL = 'https://functions.poehali.dev/276b388d-d419-4e14-9bb5-bb213221734f';
+const UPLOAD_URL = 'https://functions.poehali.dev/670031e7-23af-443b-8bfa-119b304dcc51';
+
+export async function uploadBackground(dataUrl: string): Promise<string> {
+  const res = await fetch(UPLOAD_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: dataUrl }),
+  });
+  const data = await res.json();
+  const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+  return parsed.url;
+}
 
 export interface ApiMessage {
   id: string;
