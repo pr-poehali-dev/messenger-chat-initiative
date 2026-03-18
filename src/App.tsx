@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,23 +8,32 @@ import ChatWindow from './components/messenger/ChatWindow';
 import ContactsPanel from './components/messenger/ContactsPanel';
 import NotificationsPanel from './components/messenger/NotificationsPanel';
 import ProfilePanel from './components/messenger/ProfilePanel';
-import { chats, notifications } from './data/mockData';
+import { fetchChats } from './api/messenger';
+import { notifications } from './data/mockData';
 
 type Tab = 'chats' | 'contacts' | 'notifications' | 'profile';
 
 const MessengerApp = () => {
   const [activeTab, setActiveTab] = useState<Tab>('chats');
   const [activeChatId, setActiveChatId] = useState<string | null>('c1');
+  const [unreadChats, setUnreadChats] = useState(0);
 
-  const unreadChats = chats.reduce((sum, c) => sum + c.unread, 0);
+  useEffect(() => {
+    fetchChats().then(({ chats }) => {
+      setUnreadChats(chats.reduce((sum, c) => sum + c.unread, 0));
+    });
+  }, []);
+
   const unreadNotifications = notifications.filter((n) => !n.read).length;
 
   const handleStartChatFromContact = (userId: string) => {
-    const chat = chats.find((c) => c.userId === userId);
-    if (chat) {
-      setActiveChatId(chat.id);
-      setActiveTab('chats');
-    }
+    fetchChats().then(({ chats }) => {
+      const chat = chats.find((c) => c.userId === userId);
+      if (chat) {
+        setActiveChatId(chat.id);
+        setActiveTab('chats');
+      }
+    });
   };
 
   return (

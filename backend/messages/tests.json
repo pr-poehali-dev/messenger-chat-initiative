@@ -1,0 +1,29 @@
+{
+  "tests": [
+    {
+      "name": "GET messages for chat c1",
+      "method": "GET",
+      "path": "/?chat_id=c1",
+      "expectedStatus": 200,
+      "expectedBody": {"messages": [{"chatId": "c1", "senderId": "u1", "type": "text"}]},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST send message",
+      "method": "POST",
+      "path": "/",
+      "body": {"chatId": "c1", "senderId": "me", "text": "Тест сообщение", "type": "text"},
+      "expectedStatus": 200,
+      "expectedBody": {"message": {"chatId": "c1", "senderId": "me"}},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "PUT mark read",
+      "method": "PUT",
+      "path": "/?action=read&chat_id=c1",
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

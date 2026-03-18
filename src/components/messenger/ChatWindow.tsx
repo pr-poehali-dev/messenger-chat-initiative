@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import Avatar from './Avatar';
-import { chats, users, messages as mockMessages, currentUser } from '@/data/mockData';
-import type { Message } from '@/data/mockData';
+import { chats, users } from '@/data/mockData';
+import { fetchMessages, sendMessage as apiSendMessage, markRead } from '@/api/messenger';
+import type { ApiMessage } from '@/api/messenger';
 
 interface ChatWindowProps {
   chatId: string | null;
@@ -10,7 +11,8 @@ interface ChatWindowProps {
 
 export default function ChatWindow({ chatId }: ChatWindowProps) {
   const [inputText, setInputText] = useState('');
-  const [chatMessages, setChatMessages] = useState<Message[]>([]);
+  const [chatMessages, setChatMessages] = useState<ApiMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showCall, setShowCall] = useState(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
@@ -19,9 +21,14 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
   const recordIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (chatId) {
-      setChatMessages(mockMessages[chatId] || []);
-    }
+    if (!chatId) return;
+    setIsLoading(true);
+    fetchMessages(chatId)
+      .then((msgs) => {
+        setChatMessages(msgs);
+        markRead(chatId);
+      })
+      .finally(() => setIsLoading(false));
   }, [chatId]);
 
   useEffect(() => {
@@ -56,34 +63,51 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
   const user = users.find((u) => u.id === chat?.userId);
   const userIdx = users.findIndex((u) => u.id === chat?.userId);
 
-  const sendMessage = () => {
-    if (!inputText.trim()) return;
-    const msg: Message = {
-      id: `m${Date.now()}`,
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !chatId) return;
+    const text = inputText.trim();
+    setInputText('');
+    const optimistic: ApiMessage = {
+      id: `tmp-${Date.now()}`,
       chatId,
       senderId: 'me',
-      text: inputText.trim(),
-      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      text,
       type: 'text',
+      duration: 0,
       read: false,
+      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
     };
-    setChatMessages((prev) => [...prev, msg]);
-    setInputText('');
+    setChatMessages((prev) => [...prev, optimistic]);
+    try {
+      const saved = await apiSendMessage({ chatId, senderId: 'me', text, type: 'text' });
+      setChatMessages((prev) => prev.map((m) => m.id === optimistic.id ? saved : m));
+    } catch {
+      setChatMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setInputText(text);
+    }
   };
 
-  const sendVoice = () => {
-    const msg: Message = {
-      id: `m${Date.now()}`,
+  const handleSendVoice = async () => {
+    if (!chatId) return;
+    const duration = recordSeconds;
+    setIsRecording(false);
+    const optimistic: ApiMessage = {
+      id: `tmp-${Date.now()}`,
       chatId,
       senderId: 'me',
       text: 'Голосовое сообщение',
-      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
       type: 'voice',
-      duration: recordSeconds,
+      duration,
       read: false,
+      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
     };
-    setChatMessages((prev) => [...prev, msg]);
-    setIsRecording(false);
+    setChatMessages((prev) => [...prev, optimistic]);
+    try {
+      const saved = await apiSendMessage({ chatId, senderId: 'me', text: 'Голосовое сообщение', type: 'voice', duration });
+      setChatMessages((prev) => prev.map((m) => m.id === optimistic.id ? saved : m));
+    } catch {
+      setChatMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+    }
   };
 
   const formatDuration = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -124,7 +148,12 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {chatMessages.map((msg, i) => {
+        {isLoading && (
+          <div className="flex items-center justify-center h-20">
+            <div className="w-6 h-6 rounded-full border-2 border-violet-500/50 border-t-violet-500 animate-spin" />
+          </div>
+        )}
+        {!isLoading && chatMessages.map((msg, i) => {
           const isMe = msg.senderId === 'me';
           return (
             <div
@@ -153,7 +182,7 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
                           <div
                             key={idx}
                             className="w-0.5 bg-white/60 rounded-full"
-                            style={{ height: `${Math.random() * 16 + 4}px` }}
+                            style={{ height: `${(idx % 5) * 3 + 4}px` }}
                           />
                         ))}
                       </div>
@@ -197,7 +226,7 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
               <Icon name="X" size={16} />
             </button>
             <button
-              onClick={sendVoice}
+              onClick={handleSendVoice}
               className="w-8 h-8 rounded-xl grad-bg flex items-center justify-center text-white shadow-lg"
             >
               <Icon name="Send" size={14} />
@@ -212,7 +241,7 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
               <input
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Написать сообщение..."
                 className="w-full bg-white/5 border border-white/8 rounded-2xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-violet-500/50 transition-colors pr-10"
               />
@@ -222,7 +251,7 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
             </div>
             {inputText ? (
               <button
-                onClick={sendMessage}
+                onClick={handleSendMessage}
                 className="w-9 h-9 rounded-xl grad-bg flex items-center justify-center text-white shadow-lg glow-purple hover:opacity-90 transition-opacity"
               >
                 <Icon name="Send" size={14} />
