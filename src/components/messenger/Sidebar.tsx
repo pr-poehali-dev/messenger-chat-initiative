@@ -1,7 +1,7 @@
 import React from 'react';
 import Icon from '@/components/ui/icon';
 import Avatar from './Avatar';
-import { currentUser } from '@/data/mockData';
+import type { AuthUser } from '@/api/auth';
 
 type Tab = 'chats' | 'contacts' | 'notifications' | 'profile';
 
@@ -10,6 +10,8 @@ interface SidebarProps {
   onTabChange: (tab: Tab) => void;
   unreadChats: number;
   unreadNotifications: number;
+  currentUser: AuthUser;
+  onLogout: () => void;
 }
 
 const tabs: { id: Tab; icon: string; label: string }[] = [
@@ -19,7 +21,7 @@ const tabs: { id: Tab; icon: string; label: string }[] = [
   { id: 'profile', icon: 'User', label: 'Профиль' },
 ];
 
-export default function Sidebar({ activeTab, onTabChange, unreadChats, unreadNotifications }: SidebarProps) {
+export default function Sidebar({ activeTab, onTabChange, unreadChats, unreadNotifications, currentUser, onLogout }: SidebarProps) {
   const badges: Partial<Record<Tab, number>> = {
     chats: unreadChats,
     notifications: unreadNotifications,
@@ -60,7 +62,11 @@ export default function Sidebar({ activeTab, onTabChange, unreadChats, unreadNot
         })}
       </div>
 
-      <button className="w-10 h-10 rounded-2xl flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200">
+      <button
+        onClick={onLogout}
+        className="w-10 h-10 rounded-2xl flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+        title="Выйти"
+      >
         <Icon name="LogOut" size={16} />
       </button>
     </div>

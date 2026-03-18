@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import Icon from '@/components/ui/icon';
 import Avatar from './Avatar';
-import { currentUser } from '@/data/mockData';
 import { uploadBackground } from '@/api/messenger';
+import type { AuthUser } from '@/api/auth';
 
 interface ProfilePanelProps {
+  currentUser: AuthUser;
   appBg: string;
   chatBg: string;
   onAppBgChange: (url: string) => void;
@@ -13,7 +14,7 @@ interface ProfilePanelProps {
 
 type Section = 'profile' | 'appearance' | 'notifications';
 
-export default function ProfilePanel({ appBg, chatBg, onAppBgChange, onChatBgChange }: ProfilePanelProps) {
+export default function ProfilePanel({ currentUser, appBg, chatBg, onAppBgChange, onChatBgChange }: ProfilePanelProps) {
   const [activeSection, setActiveSection] = useState<Section>('profile');
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(currentUser.name);

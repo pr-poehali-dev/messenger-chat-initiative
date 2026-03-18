@@ -1,11 +1,11 @@
 {
   "tests": [
     {
-      "name": "GET chats list",
+      "name": "GET chats without token returns 401",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": {"chats": [{"id": "c1"}]},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "Unauthorized"},
       "bodyMatcher": "partial"
     }
   ]

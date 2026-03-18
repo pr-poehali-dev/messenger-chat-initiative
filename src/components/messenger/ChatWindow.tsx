@@ -1,19 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import Avatar from './Avatar';
-import { chats, users } from '@/data/mockData';
-import { fetchMessages, sendMessage as apiSendMessage, markRead } from '@/api/messenger';
-import type { ApiMessage } from '@/api/messenger';
+import { fetchMessages, sendMessage as apiSendMessage, markRead, fetchChats } from '@/api/messenger';
+import type { ApiMessage, ApiUser } from '@/api/messenger';
 
 interface ChatWindowProps {
   chatId: string | null;
   chatBg?: string;
+  currentUserId?: string;
 }
 
-export default function ChatWindow({ chatId, chatBg }: ChatWindowProps) {
+export default function ChatWindow({ chatId, chatBg, currentUserId = 'me' }: ChatWindowProps) {
   const [inputText, setInputText] = useState('');
   const [chatMessages, setChatMessages] = useState<ApiMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [chatUser, setChatUser] = useState<ApiUser | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [showCall, setShowCall] = useState(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
@@ -41,6 +42,10 @@ export default function ChatWindow({ chatId, chatBg }: ChatWindowProps) {
     if (!chatId) return;
     lastMsgIdRef.current = null;
     loadMessages(chatId, true);
+    fetchChats().then(({ chats, users }) => {
+      const chat = chats.find((c) => c.id === chatId);
+      if (chat && users[chat.userId]) setChatUser(users[chat.userId]);
+    });
 
     pollingRef.current = setInterval(() => loadMessages(chatId), 3000);
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
@@ -74,9 +79,8 @@ export default function ChatWindow({ chatId, chatBg }: ChatWindowProps) {
     );
   }
 
-  const chat = chats.find((c) => c.id === chatId);
-  const user = users.find((u) => u.id === chat?.userId);
-  const userIdx = users.findIndex((u) => u.id === chat?.userId);
+  const user = chatUser;
+  const userIdx = 0;
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !chatId) return;
@@ -85,16 +89,17 @@ export default function ChatWindow({ chatId, chatBg }: ChatWindowProps) {
     const optimistic: ApiMessage = {
       id: `tmp-${Date.now()}`,
       chatId,
-      senderId: 'me',
+      senderId: currentUserId,
       text,
       type: 'text',
       duration: 0,
       read: false,
       time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      isMe: true,
     };
     setChatMessages((prev) => [...prev, optimistic]);
     try {
-      const saved = await apiSendMessage({ chatId, senderId: 'me', text, type: 'text' });
+      const saved = await apiSendMessage({ chatId, text, type: 'text' });
       setChatMessages((prev) => prev.map((m) => m.id === optimistic.id ? saved : m));
     } catch {
       setChatMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
@@ -109,16 +114,17 @@ export default function ChatWindow({ chatId, chatBg }: ChatWindowProps) {
     const optimistic: ApiMessage = {
       id: `tmp-${Date.now()}`,
       chatId,
-      senderId: 'me',
+      senderId: currentUserId,
       text: 'Голосовое сообщение',
       type: 'voice',
       duration,
       read: false,
       time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      isMe: true,
     };
     setChatMessages((prev) => [...prev, optimistic]);
     try {
-      const saved = await apiSendMessage({ chatId, senderId: 'me', text: 'Голосовое сообщение', type: 'voice', duration });
+      const saved = await apiSendMessage({ chatId, text: 'Голосовое сообщение', type: 'voice', duration });
       setChatMessages((prev) => prev.map((m) => m.id === optimistic.id ? saved : m));
     } catch {
       setChatMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
@@ -174,7 +180,7 @@ export default function ChatWindow({ chatId, chatBg }: ChatWindowProps) {
           </div>
         )}
         {!isLoading && chatMessages.map((msg, i) => {
-          const isMe = msg.senderId === 'me';
+          const isMe = msg.isMe !== undefined ? msg.isMe : msg.senderId === currentUserId;
           return (
             <div
               key={msg.id}
